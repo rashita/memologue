@@ -10,6 +10,8 @@ Memolineは「メモを育てる」ことを目的に設計されています。
 
 短い断片（メモ）を捕捉し、エディタで展開・接続し、浮かび上がるテーマをメタラインに結晶させる。この3段階の流れを1つのツールで完結させます。データはすべてブラウザのローカルストレージに保存され、サーバーもアカウントも不要です。
 
+DEMO:https://rashita.github.io/memologue/
+
 ---
 
 ## 3つの画面
@@ -38,7 +40,7 @@ Memolineは「メモを育てる」ことを目的に設計されています。
 ### インストール
 
 ```
-git clone https://github.com/rashita/memoline.git
+git clone https://github.com/rashita/memologue.git
 ```
 
 `index.html` をブラウザで開くだけで動作します。ビルド不要、依存パッケージなし。
@@ -81,7 +83,7 @@ git clone https://github.com/rashita/memoline.git
 ## 技術構成
 
 - HTML / CSS / JavaScript（フレームワーク・ライブラリなし）
-- 単一ファイル構成（`memoline.html`）
+- 単一ファイル構成（`index.html`）
 - ブラウザ標準APIのみ使用
 
 ---

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memoline</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #F5F3ED;
+  --surface:    #FFFFFF;
+  --panel-bg:   #EDEAE2;
+  --border:     #D8D4CB;
+  --text:       #1A1A1A;
+  --text-sub:   #908C84;
+  --accent:     #3C6A5A;
+  --accent-bg:  #E7EFEB;
+  --tag-color:  #445E8C;
+  --tag-bg:     #EAEEF5;
+  --danger:     #C05A5A;
+
+  --panel-w:    260px;
+  --anim:       0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI',
+               'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ── VIEWPORT & SCREENS ─────────────────────────────── */
+#viewport {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  transition: transform var(--anim);
+  will-change: transform;
+}
+
+/* ── NAV ARROWS ──────────────────────────────────────── */
+.nav-arrow {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 200;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--border);
+  font-size: 36px;
+  line-height: 1;
+  padding: 20px 10px;
+  transition: color 0.2s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.nav-arrow:hover { color: var(--accent); }
+#navLeft  { left: 0; }
+#navRight { right: 0; }
+
+/* ── SCREEN DOTS ─────────────────────────────────────── */
+.screen-dots {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 200;
+}
+.screen-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s, transform 0.2s;
+}
+.screen-dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+
+/* ── SCROLLBAR ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════════════════
+   SCREEN 0 — メモライン
+═══════════════════════════════════════════════════════ */
+#s-memo {
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 64px 0 80px;
+}
+
+.memo-col {
+  width: 100%;
+  max-width: 580px;
+  padding: 0 52px;
+}
+
+/* Input area */
+.memo-input-wrap {
+  margin-bottom: 52px;
+}
+
+#memoInput {
+  width: 100%;
+  border: none;
+  border-bottom: 1.5px solid var(--border);
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+  padding: 8px 0 10px;
+  outline: none;
+  resize: none;
+  line-height: 1.65;
+  transition: border-color 0.2s;
+  overflow: hidden;
+  min-height: 36px;
+}
+#memoInput:focus { border-bottom-color: var(--accent); }
+#memoInput::placeholder { color: var(--text-sub); }
+
+.memo-input-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.hint-text {
+  font-size: 11px;
+  color: var(--text-sub);
+  letter-spacing: 0.03em;
+}
+
+.btn-save {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 5px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: opacity 0.15s;
+}
+.btn-save:hover { opacity: 0.82; }
+
+/* Memo list */
+.memo-list { display: flex; flex-direction: column; }
+
+.memo-item {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: padding 0.15s, background 0.15s;
+}
+.memo-item:first-child { border-top: 1px solid var(--border); }
+.memo-item:hover {
+  background: var(--accent-bg);
+  padding: 15px 14px;
+  margin: 0 -14px;
+}
+
+.memo-ts {
+  font-size: 11px;
+  color: var(--text-sub);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.memo-body {
+  font-size: 14.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.memo-del {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.memo-item:hover .memo-del { opacity: 1; }
+.memo-del:hover { color: var(--danger); }
+
+.memo-empty {
+  color: var(--text-sub);
+  font-size: 13px;
+  text-align: center;
+  padding: 56px 0;
+  line-height: 2;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCREEN 1 — ノートライン
+═══════════════════════════════════════════════════════ */
+#s-note {
+  display: flex;
+  height: 100%;
+}
+
+/* Side panels */
+.side-panel {
+  flex-shrink: 0;
+  width: var(--panel-w);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  transition: width var(--anim), opacity var(--anim);
+}
+.side-panel.left  { border-right: 1px solid var(--border); }
+.side-panel.right { border-left:  1px solid var(--border); }
+.side-panel.closed { width: 0; opacity: 0; overflow: hidden; }
+
+.panel-inner {
+  width: var(--panel-w);
+  padding: 16px 16px 60px;
+}
+
+.panel-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.panel-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-sub);
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px;
+  transition: color 0.15s;
+}
+.panel-close-btn:hover { color: var(--accent); }
+
+/* Memo list in panel */
+.p-memo-item {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: color 0.15s;
+}
+.p-memo-item:first-child { border-top: 1px solid var(--border); }
+.p-memo-item:hover { color: var(--accent); }
+.p-memo-ts { display: none; }
+
+/* Tag list in panel */
+.p-tag-list { display: flex; flex-direction: column; gap: 7px; }
+.p-tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--tag-bg);
+  color: var(--tag-color);
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+  width: fit-content;
+}
+.p-tag:hover, .p-tag.active {
+  border-color: var(--tag-color);
+  background: #DDE2F0;
+}
+
+.panel-empty {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.8;
+}
+
+/* ── EDITOR PANEL ────────────────────────────────────── */
+.editor-panel {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.editor-toolbar {
+  height: 44px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tb-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+.tb-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.tb-btn.on    { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+
+.tb-sep { flex: 1; }
+
+.filter-chip {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  background: var(--tag-bg);
+  color: var(--tag-color);
+  font-size: 11px;
+  padding: 3px 8px 3px 11px;
+  border-radius: 12px;
+  border: 1px solid #C5CDE8;
+}
+.filter-chip.visible { display: flex; }
+.filter-chip-x {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--tag-color);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 0 0 2px;
+}
+
+.tb-panel-btns { display: flex; gap: 4px; }
+
+.editor-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#noteTA {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: Georgia, 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--text);
+  background: transparent;
+  padding: 36px 56px;
+  overflow-y: auto;
+  tab-size: 2;
+}
+
+#notePreview {
+  position: absolute;
+  inset: 0;
+  padding: 36px 56px;
+  overflow-y: auto;
+  font-family: Georgia, 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--text);
+  display: none;
+}
+#notePreview.visible { display: block; }
+
+/* Preview markdown styles */
+.pv-section { }
+.pv-section.hidden { display: none; }
+.pv-section.folded .pv-body { display: none; }
+.pv-section.folded .fold-arrow { transform: rotate(-90deg); }
+
+.pv-h-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.fold-arrow {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--text-sub);
+  transition: transform 0.18s;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-h1 { font-size: 21px; font-weight: 700; margin: 32px 0 10px; line-height: 1.4; }
+.pv-h2 { font-size: 17px; font-weight: 600; margin: 26px 0 8px;  line-height: 1.45; }
+.pv-h3 { font-size: 15px; font-weight: 600; margin: 20px 0 6px;  line-height: 1.5;  }
+
+.pv-body { }
+.pv-p { margin-bottom: 10px; }
+.pv-br { height: 6px; display: block; }
+
+.pv-tag {
+  color: var(--tag-color);
+  background: var(--tag-bg);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.88em;
+  font-family: -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCREEN 2 — メタライン
+═══════════════════════════════════════════════════════ */
+#s-meta {
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 64px 0 80px;
+}
+
+.meta-col {
+  width: 100%;
+  max-width: 580px;
+  padding: 0 52px;
+}
+
+.meta-screen-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+  margin-bottom: 32px;
+}
+
+.meta-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meta-tag-big {
+  background: var(--tag-bg);
+  color: var(--tag-color);
+  padding: 9px 20px;
+  border-radius: 22px;
+  font-size: 14.5px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  font-family: -apple-system, sans-serif;
+}
+.meta-tag-big:hover { border-color: var(--tag-color); background: #DDE2F0; }
+
+.meta-screen-empty {
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 2;
+}
+</style>
+</head>
+<body>
+
+<div id="viewport">
+
+  <!-- ── SCREEN 0: メモライン ── -->
+  <div class="screen" id="s-memo">
+    <div class="memo-col">
+      <div class="memo-input-wrap">
+        <textarea id="memoInput" rows="1" placeholder="メモを書く…"></textarea>
+        <div class="memo-input-footer">
+          <span class="hint-text">Enter で保存 &nbsp;·&nbsp; Shift+Enter で改行</span>
+          <button class="btn-save" id="memoSaveBtn">保存</button>
+        </div>
+      </div>
+      <div id="memoList"></div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 1: ノートライン ── -->
+  <div class="screen" id="s-note">
+
+    <div class="side-panel left" id="leftPanel">
+      <div class="panel-inner">
+        <div class="panel-label">
+          <span>メモライン</span>
+          <button class="panel-close-btn" onclick="togglePanel('left')">✕</button>
+        </div>
+        <div id="panelMemoList"></div>
+      </div>
+    </div>
+
+    <div class="editor-panel">
+      <div class="editor-toolbar">
+        <button class="tb-btn on" id="btnEdit"    onclick="setMode('edit')">編集</button>
+        <button class="tb-btn"    id="btnPreview" onclick="setMode('preview')">プレビュー</button>
+        <div class="filter-chip" id="filterChip">
+          <span id="filterChipLabel"></span>
+          <button class="filter-chip-x" onclick="clearFilter()" title="解除">✕</button>
+        </div>
+        <div class="tb-sep"></div>
+        <div class="tb-panel-btns">
+          <button class="tb-btn on" id="btnToggleLeft"  onclick="togglePanel('left')"  title="メモパネル">◧</button>
+          <button class="tb-btn on" id="btnToggleRight" onclick="togglePanel('right')" title="メタパネル">◨</button>
+        </div>
+      </div>
+      <div class="editor-body">
+        <textarea id="noteTA"
+          placeholder="ノートを書く…&#10;&#10;# 見出し でセクションを作成&#10;## 小見出し でネスト&#10;#ハッシュタグ でテーマを記録"></textarea>
+        <div id="notePreview"></div>
+      </div>
+    </div>
+
+    <div class="side-panel right" id="rightPanel">
+      <div class="panel-inner">
+        <div class="panel-label">
+          <span>メタライン</span>
+          <button class="panel-close-btn" onclick="togglePanel('right')">✕</button>
+        </div>
+        <div class="p-tag-list" id="panelTagList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── SCREEN 2: メタライン ── -->
+  <div class="screen" id="s-meta">
+    <div class="meta-col">
+      <div class="meta-screen-label">メタライン</div>
+      <div id="metaTagCloud"></div>
+    </div>
+  </div>
+
+</div><!-- #viewport -->
+
+<!-- Nav arrows -->
+<button class="nav-arrow" id="navLeft"  onclick="nav(-1)">‹</button>
+<button class="nav-arrow" id="navRight" onclick="nav(+1)">›</button>
+
+<!-- Screen dots -->
+<div class="screen-dots">
+  <div class="screen-dot active" data-s="0"></div>
+  <div class="screen-dot"        data-s="1"></div>
+  <div class="screen-dot"        data-s="2"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const SCREEN_IDS = ['s-memo', 's-note', 's-meta'];
+let cur = 0;                 // current screen index
+let leftOpen  = true;
+let rightOpen = true;
+let editorMode = 'edit';     // 'edit' | 'preview'
+let activeFilter = null;     // string | null
+
+// Data
+let memos = [];
+let noteContent = '';
+
+// ═══════════════════════════════════════════════════════
+// STORAGE
+// ═══════════════════════════════════════════════════════
+function persist() {
+  localStorage.setItem('ml_memos', JSON.stringify(memos));
+  localStorage.setItem('ml_note',  noteContent);
+}
+
+function hydrate() {
+  try { memos = JSON.parse(localStorage.getItem('ml_memos') || '[]'); } catch { memos = []; }
+  noteContent = localStorage.getItem('ml_note') || '';
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+function nav(dir) {
+  cur = (cur + dir + SCREEN_IDS.length) % SCREEN_IDS.length;
+  applyScreenPositions();
+}
+
+function applyScreenPositions() {
+  SCREEN_IDS.forEach((id, i) => {
+    let off = i - cur;
+    if (off >  1) off -= 3;
+    if (off < -1) off += 3;
+    document.getElementById(id).style.transform = `translateX(${off * 100}%)`;
+  });
+  document.querySelectorAll('.screen-dot').forEach(d => {
+    d.classList.toggle('active', parseInt(d.dataset.s) === cur);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// MEMO FUNCTIONS
+// ═══════════════════════════════════════════════════════
+function saveMemo() {
+  const ta = document.getElementById('memoInput');
+  const text = ta.value.trim();
+  if (!text) return;
+  memos.unshift({ id: Date.now().toString(), text, ts: new Date().toISOString() });
+  persist();
+  ta.value = '';
+  ta.style.height = 'auto';
+  renderMemoList();
+  renderPanelMemoList();
+}
+
+function deleteMemo(id, e) {
+  e.stopPropagation();
+  memos = memos.filter(m => m.id !== id);
+  persist();
+  renderMemoList();
+  renderPanelMemoList();
+}
+
+function sendMemoToEditor(text) {
+  const ta = document.getElementById('noteTA');
+  const current = ta.value;
+  const inserted = text + '\n';
+  ta.value = inserted + current;
+  noteContent = ta.value;
+  persist();
+  // Move cursor to end of inserted line
+  ta.setSelectionRange(inserted.length - 1, inserted.length - 1);
+  // Go to note screen, edit mode
+  if (cur !== 1) { cur = 1; applyScreenPositions(); }
+  if (editorMode !== 'edit') setMode('edit'); else ta.focus();
+  extractTags();
+}
+
+function fmtTs(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = now.toDateString() === d.toDateString();
+  if (today) return d.toTimeString().slice(0, 5);
+  return `${d.getMonth()+1}/${d.getDate()} ${d.toTimeString().slice(0,5)}`;
+}
+
+function renderMemoList() {
+  const el = document.getElementById('memoList');
+  if (!memos.length) {
+    el.innerHTML = '<div class="memo-empty">まだメモがありません<br><span style="font-size:12px;color:var(--text-sub)">上のフォームから記録を始めましょう</span></div>';
+    return;
+  }
+  el.innerHTML = memos.map(m => `
+    <div class="memo-item" data-id="${m.id}">
+      <div class="memo-ts">${fmtTs(m.ts)}</div>
+      <div class="memo-body">${esc(m.text)}</div>
+      <button class="memo-del" title="削除">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('.memo-item').forEach(row => {
+    const id = row.dataset.id;
+    const memo = memos.find(m => m.id === id);
+    row.querySelector('.memo-body').addEventListener('click', () => sendMemoToEditor(memo.text));
+    row.querySelector('.memo-ts').addEventListener('click', () => sendMemoToEditor(memo.text));
+    row.querySelector('.memo-del').addEventListener('click', e => deleteMemo(id, e));
+  });
+}
+
+function renderPanelMemoList() {
+  const el = document.getElementById('panelMemoList');
+  if (!memos.length) {
+    el.innerHTML = '<div class="panel-empty">メモなし</div>';
+    return;
+  }
+  el.innerHTML = memos.map(m =>
+    `<div class="p-memo-item" data-id="${m.id}">${esc(m.text)}</div>`
+  ).join('');
+  el.querySelectorAll('.p-memo-item').forEach(row => {
+    const id = row.dataset.id;
+    const memo = memos.find(m => m.id === id);
+    row.addEventListener('click', () => sendMemoToEditor(memo.text));
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// EDITOR FUNCTIONS
+// ═══════════════════════════════════════════════════════
+function setMode(mode) {
+  editorMode = mode;
+  const ta  = document.getElementById('noteTA');
+  const pv  = document.getElementById('notePreview');
+  const bE  = document.getElementById('btnEdit');
+  const bP  = document.getElementById('btnPreview');
+
+  if (mode === 'edit') {
+    ta.style.display = 'block';
+    pv.classList.remove('visible');
+    bE.classList.add('on'); bP.classList.remove('on');
+    ta.focus();
+  } else {
+    ta.style.display = 'none';
+    pv.classList.add('visible');
+    bE.classList.remove('on'); bP.classList.add('on');
+    renderPreview();
+  }
+}
+
+let saveTimer;
+function onNoteInput() {
+  noteContent = document.getElementById('noteTA').value;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { persist(); extractTags(); }, 250);
+}
+
+// ═══════════════════════════════════════════════════════
+// HASHTAG EXTRACTION
+// ═══════════════════════════════════════════════════════
+// Match #word (not preceded by # or space after heading markers)
+const TAG_RE = /#([^\s#　、。，．！？!?,./\\[\]()（）【】「」『』\n\r]+)/g;
+
+function extractTags() {
+  const tags = new Set();
+  for (const line of noteContent.split('\n')) {
+    if (/^#{1,6}\s/.test(line)) continue; // skip headings
+    TAG_RE.lastIndex = 0;
+    let m;
+    while ((m = TAG_RE.exec(line)) !== null) tags.add('#' + m[1]);
+  }
+  const arr = [...tags];
+  renderPanelTagList(arr);
+  renderMetaTagCloud(arr);
+  return arr;
+}
+
+function renderPanelTagList(tags) {
+  const el = document.getElementById('panelTagList');
+  if (!tags.length) {
+    el.innerHTML = '<div class="panel-empty">ハッシュタグなし</div>';
+    return;
+  }
+  el.innerHTML = tags.map(t => `
+    <div class="p-tag${activeFilter === t ? ' active' : ''}" data-tag="${esc(t)}">${esc(t)}</div>
+  `).join('');
+  el.querySelectorAll('.p-tag').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const tag = chip.dataset.tag;
+      activeFilter === tag ? clearFilter() : applyFilter(tag);
+    });
+  });
+}
+
+function renderMetaTagCloud(tags) {
+  const el = document.getElementById('metaTagCloud');
+  if (!tags.length) {
+    el.innerHTML = '<div class="meta-screen-empty">ノートに #ハッシュタグ を追加すると<br>ここに一覧されます</div>';
+    return;
+  }
+  el.innerHTML = tags.map(t => `
+    <div class="meta-tag-big" data-tag="${esc(t)}">${esc(t)}</div>
+  `).join('');
+  el.querySelectorAll('.meta-tag-big').forEach(chip => {
+    chip.addEventListener('click', () => {
+      cur = 1; applyScreenPositions();
+      applyFilter(chip.dataset.tag);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════════════════
+function applyFilter(tag) {
+  activeFilter = tag;
+  const chip = document.getElementById('filterChip');
+  document.getElementById('filterChipLabel').textContent = tag;
+  chip.classList.add('visible');
+  setMode('preview');
+  extractTags(); // re-render tag list with active state
+}
+
+function clearFilter() {
+  activeFilter = null;
+  document.getElementById('filterChip').classList.remove('visible');
+  if (editorMode === 'preview') renderPreview();
+  extractTags();
+}
+
+// ═══════════════════════════════════════════════════════
+// PREVIEW RENDERER
+// ═══════════════════════════════════════════════════════
+function renderPreview() {
+  const el = document.getElementById('notePreview');
+  const content = noteContent;
+  if (!content.trim()) {
+    el.innerHTML = '<span style="color:var(--text-sub);font-size:13px;">プレビューする内容がありません</span>';
+    return;
+  }
+
+  // ── Parse into sections ──
+  const lines = content.split('\n');
+  const sections = [];
+  let sec = null;
+
+  for (const line of lines) {
+    const m1 = line.match(/^#(?!#)\s+(.+)/);
+    const m2 = line.match(/^##(?!#)\s+(.+)/);
+    const m3 = line.match(/^###\s+(.+)/);
+    const hMatch = m3 || m2 || m1;
+    const hLevel = m3 ? 3 : m2 ? 2 : m1 ? 1 : 0;
+
+    if (hMatch) {
+      if (sec) sections.push(sec);
+      sec = { level: hLevel, heading: hMatch[1], lines: [] };
+    } else {
+      if (!sec) sec = { level: 0, heading: null, lines: [] };
+      sec.lines.push(line);
+    }
+  }
+  if (sec) sections.push(sec);
+
+  // ── Render ──
+  let html = '';
+  sections.forEach((s, idx) => {
+    const bodyText = s.lines.join(' ');
+    const fullText = (s.heading || '') + ' ' + bodyText;
+    const hidden = activeFilter && !fullText.includes(activeFilter);
+    const hiddenCls = hidden ? ' hidden' : '';
+
+    if (s.level === 0) {
+      html += `<div class="pv-section${hiddenCls}">${renderBody(s.lines)}</div>`;
+    } else {
+      html += `
+        <div class="pv-section${hiddenCls}" data-idx="${idx}">
+          <div class="pv-h${s.level} pv-h-row" onclick="foldSection(${idx})">
+            <span class="fold-arrow">▾</span>
+            <span>${inline(s.heading)}</span>
+          </div>
+          <div class="pv-body">${renderBody(s.lines)}</div>
+        </div>`;
+    }
+  });
+
+  // No results message
+  if (activeFilter) {
+    const anyVisible = sections.some(s => {
+      const t = (s.heading || '') + ' ' + s.lines.join(' ');
+      return t.includes(activeFilter);
+    });
+    if (!anyVisible) {
+      html = `<span style="color:var(--text-sub);font-size:13px;">${esc(activeFilter)} を含むセクションがありません</span>`;
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function renderBody(lines) {
+  let html = '';
+  for (const line of lines) {
+    if (!line.trim()) {
+      html += '<span class="pv-br"></span>';
+    } else {
+      html += `<p class="pv-p">${inline(line)}</p>`;
+    }
+  }
+  return html;
+}
+
+function inline(text) {
+  if (!text) return '';
+  let s = esc(text);
+  // Hashtags
+  s = s.replace(/#([^\s#　、。，．！？!?,./\\[\]()（）【】「」『』&]+)/g,
+    '<span class="pv-tag">#$1</span>');
+  // Bold **text**
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic *text*
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return s;
+}
+
+function foldSection(idx) {
+  const el = document.querySelector(`.pv-section[data-idx="${idx}"]`);
+  if (el) el.classList.toggle('folded');
+}
+
+// ═══════════════════════════════════════════════════════
+// PANEL TOGGLE
+// ═══════════════════════════════════════════════════════
+function togglePanel(side) {
+  if (side === 'left') {
+    leftOpen = !leftOpen;
+    document.getElementById('leftPanel').classList.toggle('closed', !leftOpen);
+    document.getElementById('btnToggleLeft').classList.toggle('on', leftOpen);
+  } else {
+    rightOpen = !rightOpen;
+    document.getElementById('rightPanel').classList.toggle('closed', !rightOpen);
+    document.getElementById('btnToggleRight').classList.toggle('on', rightOpen);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  // Alt + ← / → : navigate screens
+  if (e.altKey && !e.metaKey && !e.ctrlKey) {
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); nav(-1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); nav(+1); return; }
+  }
+  // Enter in memo input (without Shift)
+  if (e.key === 'Enter' && !e.shiftKey && document.activeElement === document.getElementById('memoInput')) {
+    e.preventDefault();
+    saveMemo();
+  }
+  // Escape: clear filter
+  if (e.key === 'Escape' && activeFilter) { clearFilter(); }
+});
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+  hydrate();
+  applyScreenPositions();
+  renderMemoList();
+  renderPanelMemoList();
+
+  const ta = document.getElementById('noteTA');
+  ta.value = noteContent;
+  extractTags();
+
+  // Memo input: auto-grow
+  const memoTA = document.getElementById('memoInput');
+  memoTA.addEventListener('input', () => {
+    memoTA.style.height = 'auto';
+    memoTA.style.height = memoTA.scrollHeight + 'px';
+  });
+  document.getElementById('memoSaveBtn').addEventListener('click', saveMemo);
+
+  // Note editor input
+  ta.addEventListener('input', onNoteInput);
+
+  // Prevent accidental nav arrow triggering in editor
+  ta.addEventListener('keydown', e => e.stopPropagation());
+  memoTA.addEventListener('keydown', e => { if(e.key!=='Enter') e.stopPropagation(); });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -38,10 +38,10 @@ Memolineは「メモを育てる」ことを目的に設計されています。
 ### インストール
 
 ```
-git clone https://github.com/YOUR_USERNAME/memoline.git
+git clone https://github.com/rashita/memoline.git
 ```
 
-`memoline.html` をブラウザで開くだけで動作します。ビルド不要、依存パッケージなし。
+`index.html` をブラウザで開くだけで動作します。ビルド不要、依存パッケージなし。
 
 ### 基本操作
 
